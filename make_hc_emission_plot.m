@@ -69,9 +69,23 @@ setup_axes(ax, n, y1_label, y2_label, xlabel_text);
 
 t = "funcCreateLegend('DataNumber', 1, 'sides', 'l+r', 'location', 'north', 'Linelength', 50)";
 title(ax, t, "Interpreter", "none");
-funcCreateLegend("DataNumber", 1, "sides", "l+r", "location", "north", "Linelength", 50);
+% Use a cell array for the actual argument; title shows the exact string.
+hLeg = funcCreateLegend("DataNumber", 1, "sides", "l+r", "location", "north", "Linelength", 50, "Linestyle", ["-", "--"]);
 
 exportgraphics(f, fullfile(this_dir, "Example3.png"));
+
+% Now change multiple legend settings post-creation and save again
+hLeg = funcUpdateLegend( ...
+    hLeg, ...
+    "location",   "northwest", ...
+    "Percoffset", [5, 5], ...
+    "Linelength", 70 ...
+);
+
+% Update the title to document the applied funcUpdateLegend settings
+u = "funcUpdateLegend('location','northwest','Percoffset',[5,5], 'Linelength',70";
+title(ax, u, "Interpreter", "none");
+exportgraphics(f, fullfile(this_dir, "Example3_1.png"));
 
 %% --- Figure 4: + Text and Absoffset --------------------------------------
 f = newfig(); ax = axes("Parent", f);

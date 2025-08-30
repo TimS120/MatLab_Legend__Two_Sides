@@ -161,7 +161,7 @@
 %   Example: 'DataNumber', 5
 
 
-function funcCreateLegend(varargin)
+function hLeg = funcCreateLegend(varargin)
     % Arg1: Additional settings
     %
     % The function creates a legend with additional options which can't be
@@ -187,6 +187,7 @@ function funcCreateLegend(varargin)
     %% Creation of the legend
     % Textfield of the legend
     hA1 = annotation('textbox', 'String', x.szText, 'interpreter', 'none');
+    set(hA1, "Tag", "CreateLegend_Text");
     set(hA1, 'BackgroundColor', 'white', 'HorizontalAlignment', 'left', 'LineStyle', 'none',...
         'Units', 'pixels', 'Fontname', x.szFontname, 'Fontsize', x.nFontsize);
     set(hA1, 'FitBoxToText', 'on');
@@ -214,59 +215,70 @@ function funcCreateLegend(varargin)
     % Lines of the leftside
     if(x.nAxisChoice == 1.0 || x.nAxisChoice == 1.1)
         pause(0.1);  % This is necessary, because the last step wouldn't be executed without this
-        s1 = axes();
+        sLeft = axes();
+        set(sLeft, "Tag", "CreateLegend_LeftAxes");
+        leftLines = gobjects(1, nNumTests);
+        arrowsLeft = gobjects(1, 0);  % may stay empty if arrows are off
         
         for i=1:nNumTests
             y = [nNumTests-i, nNumTests-i, nNumTests-i];
-            p1 = plot(x1,y, x.szLinestyle(1));
+            p1 = plot(x1, y, x.szLinestyle(1));
             set(p1, 'color', x.nColors{1, i}, 'linewidth', x.nLinewidth);
+            leftLines(i) = p1;
     
             % Arrows left
             if(x.bArrowsOn)
                 a1 = annotation('textarrow');
-                set(a1, 'units', 'pixels', 'color', x.nColors{1, i});
+                set(a1, "Tag", "CreateLegend_ArrowLeft", 'units', 'pixels', 'color', x.nColors{1, i});
                 nHighFactor = ((0.65+(i-1))/nYLimitRange);
                 nTempPos = [nPos(1)-x.nLinelength+5*x.nLinewidth, nPos(2)+nPos(4)-nHighFactor*nPos(4)+nLineThickness, -5*x.nLinewidth, 0];
                 set(a1, 'pos', nTempPos);
+                arrowsLeft(1, end+1) = a1; %#ok<AGROW>
             end
             hold on;
         end
         hold off;
     
         ylim([0-nCorrFactor, nNumTests-1+nCorrFactor]);
-        set(s1, 'units', 'pixels', 'xTick', [], 'yTick', [], 'XColor', 'white', 'YColor', 'white', 'TickDir', 'out');
-        set(s1, 'pos', [nPos(1)-x.nLinelength, nPos(2), x.nLinelength, nPos(4)]);
+        set(sLeft, 'units', 'pixels', 'xTick', [], 'yTick', [], 'XColor', 'white', 'YColor', 'white', 'TickDir', 'out');
+        set(sLeft, 'pos', [nPos(1)-x.nLinelength, nPos(2), x.nLinelength, nPos(4)]);
     end
 
     % Lines of the rightside
     if(x.nAxisChoice == 0.1 || x.nAxisChoice == 1.1)
         pause(0.1);  % This is necessary, because the last step wouldn't be executed without this
-        s1 = axes();
+        sRight = axes();
+        set(sRight, "Tag", "CreateLegend_RightAxes");
+        rightLines = gobjects(1, nNumTests);
+        arrowsRight = gobjects(1, 0);  % may stay empty if arrows are off
     
         for i=1:nNumTests
             y = [nNumTests-i, nNumTests-i, nNumTests-i];
             p1 = plot(x1,y, x.szLinestyle(2));
             set(p1, 'color', x.nColors{1, i}, 'linewidth', x.nLinewidth);
+            rightLines(i) = p1;
 
             % Arrows right
             if(x.bArrowsOn)
                 a1 = annotation('textarrow');
-                set(a1, 'units', 'pixels', 'color', x.nColors{1, i});
+                set(a1, "Tag", "CreateLegend_ArrowRight", 'units', 'pixels', 'color', x.nColors{1, i});
                 nHighFactor = ((0.65+(i-1))/nYLimitRange);
                 nTempPos = [nPos(1)+nPos(3)+x.nLinelength-5*x.nLinewidth, nPos(2)+nPos(4)-nHighFactor*nPos(4)+nLineThickness, 5*x.nLinewidth, 0];
                 set(a1, 'pos', nTempPos);
+                arrowsRight(1, end+1) = a1; %#ok<AGROW>
             end
             hold on;
         end
         hold off;
         ylim([0-nCorrFactor, nNumTests-1+nCorrFactor]);
-        set(s1, 'units', 'pixels', 'xTick', [], 'yTick', [], 'XColor', 'white', 'YColor', 'white', 'TickDir', 'out');
-        set(s1, 'pos', [nPos(1)+nPos(3), nPos(2), x.nLinelength, nPos(4)]);
+        set(sRight, 'units', 'pixels', 'xTick', [], 'yTick', [], 'XColor', 'white', 'YColor', 'white', 'TickDir', 'out');
+        set(sRight, 'pos', [nPos(1)+nPos(3), nPos(2), x.nLinelength, nPos(4)]);
     end
 
     % Frame of the whole legend
     pause(0.1);  % This is necessary, because the last step wouldn't be executed without this
     hA2 = annotation('textbox');
+    set(hA2, "Tag", "CreateLegend_Frame");
     set(hA2, 'units', 'pixels', 'BackgroundColor', 'none');
 
     if(x.nAxisChoice == 1.0)  % Left only
@@ -283,6 +295,21 @@ function funcCreateLegend(varargin)
         set(hAxis, 'units', szUnit);
     end
     hold off;
+
+    % ---------- collect handles for external updates ----------
+    hLeg = struct();
+    hLeg.axes_handle    = hAxis;
+    hLeg.text           = hA1;
+    hLeg.frame          = hA2;
+    if exist('sLeft', 'var'),  hLeg.left_axes  = sLeft;     else, hLeg.left_axes  = []; end
+    if exist('sRight','var'),  hLeg.right_axes = sRight;    else, hLeg.right_axes = []; end
+    if exist('leftLines','var'),  hLeg.left_lines  = leftLines;  else, hLeg.left_lines  = []; end
+    if exist('rightLines','var'), hLeg.right_lines = rightLines; else, hLeg.right_lines = []; end
+    if exist('arrowsLeft','var'),  hLeg.arrows_left  = arrowsLeft;  else, hLeg.arrows_left  = []; end
+    if exist('arrowsRight','var'), hLeg.arrows_right = arrowsRight; else, hLeg.arrows_right = []; end
+    % store layout state needed for recomputation
+    hLeg.state          = x;
+    hLeg.line_thickness = nLineThickness;
 end
 
 function nPos = funcDeterminePos(nPosPlot, nLength, nHigh, nLineLength, nLineThickness, nPixelShift, szLocation, nAxisChoice)
