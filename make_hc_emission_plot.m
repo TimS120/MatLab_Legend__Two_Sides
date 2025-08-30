@@ -67,10 +67,12 @@ plot(ax, x, y2, "--", "LineWidth", 1.1, "Color", blue);
 yyaxis(ax, "left");
 setup_axes(ax, n, y1_label, y2_label, xlabel_text);
 
-t = "funcCreateLegend('DataNumber', 1, 'sides', 'l+r', 'location', 'north', 'Linelength', 50)";
+t = "funcCreateLegend('DataNumber', 1, 'sides', 'l+r', 'location', 'north', 'Linelength', 50, 'AutoUpdate','on')";
 title(ax, t, "Interpreter", "none");
 % Use a cell array for the actual argument; title shows the exact string.
-hLeg = funcCreateLegend("DataNumber", 1, "sides", "l+r", "location", "north", "Linelength", 50, "Linestyle", ["-", "--"]);
+hLeg = funcCreateLegend("DataNumber", 1, "sides", "l+r", "location", "north", ...
+                        "Linelength", 50, "Linestyle", ["-", "--"], ...
+                        "AutoUpdate", "on");  % auto reflow on resize
 
 exportgraphics(f, fullfile(this_dir, "Example3.png"));
 
@@ -83,7 +85,7 @@ hLeg = funcUpdateLegend( ...
 );
 
 % Update the title to document the applied funcUpdateLegend settings
-u = "funcUpdateLegend('location','northwest','Percoffset',[5,5], 'Linelength',70";
+u = "funcUpdateLegend('location','northwest','Percoffset',[5,5],'Linelength',70)";
 title(ax, u, "Interpreter", "none");
 exportgraphics(f, fullfile(this_dir, "Example3_1.png"));
 

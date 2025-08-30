@@ -223,6 +223,11 @@ function hLeg = funcUpdateLegend(hLeg, varargin)
 
     % Persist updated state and return
     hLeg.state = x;
+
+    % Persist updated state into the text object's appdata so auto-update sees it
+    if isgraphics(hLeg.text)
+        setappdata(hLeg.text, 'CreateLegend_Handle', hLeg);
+    end
 end
 
 % =================== local helper (geometry) ==============================

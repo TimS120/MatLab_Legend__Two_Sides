@@ -21,7 +21,7 @@
 
 ## Overview
 
-`funcCreateLegend` adds a single legend box to MATLAB figures using two y-axes, with clear left/right indicators (and optional arrows). Ideal when you plot:
+`funcCreateLegend` adds a single legend box to MATLAB figures using two y-axes, with clear left/right indicators (and optional arrows). It can also **auto-reflow** on window resize (`'AutoUpdate','on'`). Ideal when you plot:
 
 - Left axis: time-series measurement  
 - Right axis: cumulative or secondary value  
@@ -74,6 +74,8 @@ funcCreateLegend( ...
 | `Percoffset`  | `[x,y]` (%)       | `[2, 2]`                       | Offset as % of axes width/height. Not allowed together with `Absoffset`. |
 | `Linestyle`   | `string[2]`       | `["-","--"]`                   | Override indicator line styles for left and right axes. |
 | `Colors`      | `cell{[r g b]}`   | MATLAB default line colors     | Colors for each dataset, values between 0 and 1. |
+| `AutoUpdate`  | `"on"|"off"`      | `"off"`                        | If `"on"`, the legend automatically repositions (and can rescale) when the figure is resized. |
+| `ScaleAbsOffset` | `"on"|"off"`   | `"off"`                        | When using `Absoffset`, scale the pixel offset with the figure size during `AutoUpdate`. |
 
 ## Examples
 The script `make_hc_emission_plot.m` demonstrates five configurations and saves PNGs in resources/:
@@ -84,5 +86,5 @@ The script `make_hc_emission_plot.m` demonstrates five configurations and saves 
 - Example 5: Linestyle Override
 
 ## Additional
-Please feel free to use this function and if you have an improvement proposal then let me know about it.
+Please feel free to use this functions and if you have an improvement then either create a pull request or let me know about it.
 I hope this helps someone.

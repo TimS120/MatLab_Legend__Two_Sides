@@ -310,6 +310,106 @@ function hLeg = funcCreateLegend(varargin)
     % store layout state needed for recomputation
     hLeg.state          = x;
     hLeg.line_thickness = nLineThickness;
+
+    % Store base metrics for optional auto-update
+    hLeg.figure         = ancestor(hAxis,'figure');
+    hLeg.auto.baseAxesWH     = [nPlotPos(3), nPlotPos(4)];
+    hLeg.auto.baseFontsize   = x.nFontsize;
+    hLeg.auto.baseLinelength = x.nLinelength;
+    hLeg.auto.baseAbsoffset  = x.nAbsoffset;
+    hLeg.auto.scaleAbs       = x.bScaleAbsOffset;
+
+    % Keep a live copy of the legend struct on the text object
+    setappdata(hLeg.text, 'CreateLegend_Handle', hLeg);
+
+    % Attach resize listener if requested
+    if isfield(x,'bAutoUpdate') && x.bAutoUpdate
+        local_attach_autoupdate(hLeg);
+    end
+end
+
+% =================== local helper: AutoUpdate wiring ======================
+function local_attach_autoupdate(hLeg)
+% Register this legend in the figure registry and hook SizeChangedFcn once.
+    fig = hLeg.figure;
+    if ~isgraphics(fig), return; end
+    reg = getappdata(fig, 'CreateLegend_AutoRegistry');
+    if isempty(reg)
+        reg = struct('text', {}, 'baseAxesW', {}, 'baseAxesH', {}, ...
+                     'baseFontsize', {}, 'baseLinelength', {}, ...
+                     'baseAbsOffset', {}, 'scaleAbs', {});
+    end
+    % Append (handles inside hLeg are references; storing the struct is OK)
+    entry.text          = hLeg.text;   % store handle, not struct
+    entry.baseAxesW     = hLeg.auto.baseAxesWH(1);
+    entry.baseAxesH     = hLeg.auto.baseAxesWH(2);
+    entry.baseFontsize  = hLeg.auto.baseFontsize;
+    entry.baseLinelength= hLeg.auto.baseLinelength;
+    entry.baseAbsOffset = hLeg.auto.baseAbsoffset;
+    entry.scaleAbs      = logical(hLeg.auto.scaleAbs);
+    reg(end+1) = entry; %#ok<AGROW>
+    setappdata(fig, 'CreateLegend_AutoRegistry', reg);
+
+    % Install dispatcher only once; chain any existing callback
+    if ~isappdata(fig,'CreateLegend_HookInstalled') || ~getappdata(fig,'CreateLegend_HookInstalled')
+        prevHook = get(fig,'SizeChangedFcn');
+        setappdata(fig,'CreateLegend_PrevSizeChangedFcn', prevHook);
+        set(fig,'SizeChangedFcn', @CreateLegend_SizeChangedDispatcher);
+        setappdata(fig,'CreateLegend_HookInstalled', true);
+    end
+end
+
+function CreateLegend_SizeChangedDispatcher(src, ~)
+% Dispatch figure resize to all registered legends (reflow + optional scale)
+    % 1) Call any previous user hook first (best effort)
+    prevHook = getappdata(src,'CreateLegend_PrevSizeChangedFcn');
+    if ~isempty(prevHook)
+        try
+            if isa(prevHook,'function_handle')
+                prevHook(src,[]);
+            else
+                feval(prevHook, src, []);
+            end
+        catch
+            % swallow errors from foreign hooks
+        end
+    end
+    % 2) Reflow registered legends
+    reg = getappdata(src,'CreateLegend_AutoRegistry');
+    if isempty(reg), return; end
+    for k = 1:numel(reg)
+        if ~isfield(reg(k),'text') || ~isgraphics(reg(k).text), continue; end
+        % Always fetch the current legend struct (latest state)
+        hL = getappdata(reg(k).text, 'CreateLegend_Handle');
+        if isempty(hL) || ~isstruct(hL) || ~isgraphics(hL.axes_handle) || ~isgraphics(hL.text)
+            continue;
+        end
+        % Current axes size in pixels
+        oldU = get(hL.axes_handle,'Units');
+        set(hL.axes_handle,'Units','pixels');
+        ap = get(hL.axes_handle,'Position');
+        set(hL.axes_handle,'Units', oldU);
+        w = max(1, ap(3));
+        % Scale factor (clamped for readability)
+        r  = max(0.4, min(2.5, w / max(1, reg(k).baseAxesW)));
+        ls = max(16, round(reg(k).baseLinelength * r));          % line length
+        fs = max(8,  round(reg(k).baseFontsize   * sqrt(r)));    % milder scaling
+        nv = {'Linelength', ls, 'Fontsize', fs};
+        % Optionally scale absolute offsets too
+        if reg(k).scaleAbs && isfield(hL,'state') && isfield(hL.state,'nPixelOffset') && hL.state.nPixelOffset == 1
+            newAbs = round(reg(k).baseAbsOffset .* [r, sqrt(r)]);
+            nv = [nv, {'Absoffset', newAbs}];
+        end
+        try
+            hL = funcUpdateLegend(hL, nv{:}); % reflow with new metrics
+            % Persist the latest struct for any future updates
+            if isgraphics(hL.text)
+                setappdata(hL.text, 'CreateLegend_Handle', hL);
+            end
+        catch
+            % Ignore transient errors during interactive resizes
+        end
+    end
 end
 
 function nPos = funcDeterminePos(nPosPlot, nLength, nHigh, nLineLength, nLineThickness, nPixelShift, szLocation, nAxisChoice)
@@ -465,6 +565,8 @@ function x = funcManageInput(vardata)
     nDefaultAbsOffset = [15,15];
     nDefaultPercOffset = [2,2];
     szDefaultLineStyle = ["-", "--"];
+    szDefaultAutoUpdate = 'off';
+    szDefaultScaleAbsOffset = 'off';
     nDefaultColorCode = {[0, 0.4470, 0.7410], [0.8500, 0.3250, 0.0980], [0.9290, 0.6940, 0.1250]...
         [0.4940, 0.1840, 0.5560], [0.4660, 0.6740, 0.1880], [0.3010, 0.7450, 0.9330], [0.6350, 0.0780, 0.1840]};
     nDefaultDataNumber = length(findall(gca,'type','line'));  % Number of the datasets
@@ -482,6 +584,8 @@ function x = funcManageInput(vardata)
     addOptional(p, 'percoffset', nDefaultPercOffset);
     addOptional(p, 'linestyle', szDefaultLineStyle);
     addOptional(p, 'colors', nDefaultColorCode);
+    addOptional(p, 'autoupdate', szDefaultAutoUpdate);
+    addOptional(p, 'scaleabsoffset', szDefaultScaleAbsOffset);
     addOptional(p, 'datanumber', nDefaultDataNumber);
     parse(p, vardata{:});
 
@@ -499,6 +603,8 @@ function x = funcManageInput(vardata)
     x.nPercoffset = p.Results.percoffset;
     x.szLinestyle = p.Results.linestyle;
     x.nColors = p.Results.colors;
+    x.szAutoupdate = p.Results.autoupdate;
+    x.szScaleabsoffset = p.Results.scaleabsoffset;
     x.nDataNumber = p.Results.datanumber;
 
     % Conversion of the entire string/char-input into (lowercase-) strings
@@ -509,6 +615,8 @@ function x = funcManageInput(vardata)
     x.szFontname = lower(convertCharsToStrings(x.szFontname));
     x.szArrows = lower(convertCharsToStrings(x.szArrows));
     x.szLinestyle = lower(convertCharsToStrings(x.szLinestyle));
+    x.szAutoupdate = lower(string(x.szAutoupdate));
+    x.szScaleabsoffset = lower(string(x.szScaleabsoffset));
 
     % Validation of the input settings
     nFieldLength = length(fieldnames(x));
@@ -583,6 +691,22 @@ function x = funcManageInput(vardata)
             x.bArrowsOn = 1;
         end
     end
+
+    % AutoUpdate / ScaleAbsOffset flags
+    if strcmp(x.szAutoupdate,"on")
+        x.bAutoUpdate = true;
+    elseif strcmp(x.szAutoupdate,"off")
+        x.bAutoUpdate = false;
+    else
+        error("Wrong AutoUpdate choice! Use 'on' or 'off'.");
+    end
+    if strcmp(x.szScaleabsoffset,"on")
+        x.bScaleAbsOffset = true;
+    elseif strcmp(x.szScaleabsoffset,"off")
+        x.bScaleAbsOffset = false;
+    else
+        error("Wrong ScaleAbsOffset choice! Use 'on' or 'off'.");
+    end
 end
 
 function bOut = funcValidation(x, szFunction, nNumberData)
@@ -655,6 +779,12 @@ function bOut = funcValidation(x, szFunction, nNumberData)
 
     elseif(strcmp(szFunction, "nDataNumber"))
         bOut = isnumeric(x) && x>0;
+
+     elseif(strcmp(szFunction, "szAutoupdate"))
+         bOut = isstring(x) && sum(ismember(x, ["on","off"])>0);
+ 
+     elseif(strcmp(szFunction, "szScaleabsoffset"))
+         bOut = isstring(x) && sum(ismember(x, ["on","off"])>0);
 
     else
         error("Wrong attribute!");
